@@ -1,0 +1,44 @@
+name: Industry daily to WeChat
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview only, without sending'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: industry-daily
+  cancel-in-progress: false
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore sent headlines
+        uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: sent-headlines-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            sent-headlines-
+      - name: Collect and send
+        env:
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: python daily.py
+      - name: Save sent headlines
+        if: success() && inputs.dry_run != true
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: sent-headlines-${{ github.run_id }}-${{ github.run_attempt }}
