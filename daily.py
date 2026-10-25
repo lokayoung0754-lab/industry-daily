@@ -26,10 +26,12 @@ GROUPS = [
  ("拼多多", '拼多多'),
  ("Temu", 'Temu'),
  ("麦克风", '(无线麦克风 OR wireless microphone)'),
+ ("戒烟新闻", '(戒烟 OR 控烟 OR "smoking cessation") (site:who.int OR site:cdc.gov OR site:nhc.gov.cn OR site:chinacdc.cn OR site:news.cn)'),
  ("发散：AI", '人工智能 AI 电商'),
  ("发散：物流", '跨境物流 运费'),
  ("发散：供应链", '电子元器件 供应链 成本'),
 ]
+QUIT_TIPS = [["烟瘾来时先拖延，做10次缓慢深呼吸、喝水，或散步转移注意力。","https://www.who.int/campaigns/world-no-tobacco-day/2021/quitting-toolkit/quick-tips","WHO"],["确定戒烟日期，提前写下戒烟理由和应对烟瘾的计划。","https://smokefree.gov/build-your-quit-plan","美国国家癌症研究所 Smokefree"],["记录哪些场景会让你想抽烟，提前为这些场景安排替代活动。","https://smokefree.gov/challenges-when-quitting/cravings-triggers/know-your-triggers","美国国家癌症研究所 Smokefree"],["告诉身边的人你正在戒烟，请他们支持，并避开容易诱发烟瘾的吸烟场景。","https://www.cdc.gov/tobacco/campaign/tips/quit-smoking/tips-for-quitting/index.html","美国 CDC"],["戒烟困难时可向戒烟门诊求助，咨询行为支持及适合自己的戒烟药物；咨询与药物结合可提高成功机会。","https://www.cdc.gov/tobacco/about/how-to-quit.html","美国 CDC"]]
 STATE = Path(".state/seen.json")
 
 def fetch(label, query):
@@ -134,6 +136,10 @@ def main():
     if successful == 0:
         raise RuntimeError("All RSS requests failed; no report sent.")
     sections.append("<h3>为什么对我的工作很重要</h3><p>人工核查方向：平台政策看适用站点及生效日；新品看价格、功能和认证；道具看版权、材料和安全；物流看目的国和计费重量。以上为固定阅读提示，不是对本期新闻的分析。</p><h3>需要持续关注什么</h3><p>点击新闻链接核对原文及官方公告。免费定时任务可能晚于北京时间09:00送达。公开仓库长期无活动时，GitHub可能暂停定时任务。</p>")
+    tip, tip_url, tip_source = QUIT_TIPS[local.date().toordinal() % len(QUIT_TIPS)]
+    sections.append("<h3>每日戒烟方法</h3><p>" + html.escape(tip) +
+        '</p><p>来源：<a href="' + html.escape(tip_url, quote=True) + '">' +
+        html.escape(tip_source) + "</a>｜常青健康建议，非当天新闻；资料核对：2026-10-25。</p>")
     chunks = pack(sections)
     Path("daily-report.html").write_text("\n".join(chunks), encoding="utf-8")
     if dry_run:
