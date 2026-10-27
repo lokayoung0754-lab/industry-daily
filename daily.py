@@ -97,63 +97,6 @@ def send(token, title, content):
     print("PushPlus accepted message; final delivery is asynchronous.")
 
 
-PROJECT_TOPICS = [
-    ("个人效率", "topic:productivity", "看看能否减少重复操作、整理文件或管理任务。"),
-    ("日常生活", "topic:self-hosted", "看看能否用于家庭资料、相册或个人信息管理；通常需要自行部署。"),
-    ("硬件与智能家居", "topic:home-automation", "适合探索家居和设备自动化；先检查所需硬件与兼容性。"),
-    ("3D打印", "topic:3d-printing", "适合探索道具制作和打印工具；先检查打印机支持情况。"),
-    ("有趣的小众工具", "topic:desktop-app", "优先看看能否直接安装试用，再判断是否值得长期使用。"),
-]
-
-def github_projects(local, seen):
-    sections, picked = [], []
-    # Repository metadata, not AI-written reviews or a claim of domestic accessibility.
-    sections.append("<h3>每日 GitHub 项目发现</h3><p>按主题筛选：至少1000星、近一年有代码推送、公开标注许可证。"
-        "星数不代表安全或质量；以下用途为项目原始简介，适用建议为固定筛选提示。"
-        "国内访问、下载及第三方服务依赖未逐项实测；开源不等于所有功能免费。"
-        "不是当天新发布榜单。</p>")
-    active_since = (local.date() - dt.timedelta(days=365)).isoformat()
-    for label, query, reason in PROJECT_TOPICS:
-        params = urllib.parse.urlencode({
-            "q": query + " stars:>=1000 archived:false fork:false pushed:>=" + active_since,
-            "sort": "stars", "order": "desc", "per_page": 100})
-        request = urllib.request.Request("https://api.github.com/search/repositories?" + params,
-            headers={"User-Agent": "IndustryDaily/1.0", "Accept": "application/vnd.github+json"})
-        try:
-            with urllib.request.urlopen(request, timeout=25) as response:
-                repos = json.load(response).get("items", [])
-            repos = [r for r in repos if r.get("license") and r["license"].get("spdx_id") not in (None, "NOASSERTION")]
-            # Rotate the candidate order daily while keeping a per-topic quota.
-            offset = (local.date().toordinal() * 2) % max(1, len(repos))
-            repos = repos[offset:] + repos[:offset]
-            count = 0
-            for repo in repos:
-                key = "repo:" + repo["full_name"].lower()
-                if key in seen:
-                    continue
-                seen.add(key)
-                name = html.escape(repo["full_name"])
-                url = html.escape(repo["html_url"], quote=True)
-                description = html.escape((repo.get("description") or "项目未提供简介")[:500])
-                sections.append("<h4>" + html.escape(label) + '：<a href="' + url + '">' + name +
-                    "</a></h4><p>用途（仓库原文，可能为英文）：" + description +
-                    "</p><p>怎么判断适不适合你：" + html.escape(reason) +
-                    "</p><p>使用门槛/国内条件：请查 README 的安装、系统要求与服务依赖；未实测。"
-                    "费用：开源代码可查阅，硬件、托管和外部API可能收费。</p><p>星数：" +
-                    str(repo.get("stargazers_count", 0)) + "｜最近代码推送：" +
-                    html.escape(str(repo.get("pushed_at", ""))[:10]) + "｜许可证：" +
-                    html.escape(repo["license"]["spdx_id"]) + "｜查询日期：" +
-                    local.strftime("%Y-%m-%d") + "</p>")
-                picked.append({"key": key})
-                count += 1
-                if count >= 2:
-                    break
-        except Exception:
-            sections.append("<p>" + html.escape(label) + "：GitHub查询失败，本次不补造项目。</p>")
-    sections.append("<p>本次项目数：" + str(len(picked)) +
-        "/10；90天内不重复，候选不足或接口限流时如实少发。</p>")
-    return sections, picked
-
 
 def main():
     token = os.environ.get("PUSHPLUS_TOKEN", "").strip()
@@ -200,9 +143,6 @@ def main():
     sections.append("<h3>每日戒烟方法</h3><p>" + html.escape(tip) +
         '</p><p>来源：<a href="' + html.escape(tip_url, quote=True) + '">' +
         html.escape(tip_source) + "</a>｜常青健康建议，非当天新闻；资料核对：2026-10-25。</p>")
-    project_sections, project_picks = github_projects(local, seen)
-    sections.extend(project_sections)
-    picked.extend(project_picks)
     chunks = pack(sections)
     Path("daily-report.html").write_text("\n".join(chunks), encoding="utf-8")
     if dry_run:
